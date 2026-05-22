@@ -5,9 +5,19 @@ export interface CodeFile {
   size: number;
 }
 
+export interface WorkflowStep {
+  title: string;
+  description: string;
+  file: string;
+  lineRange: string;
+  type: "input" | "condition" | "operation" | "error" | "output" | "network" | "render";
+  highlightedCode: string;
+}
+
 export interface ExplainerState {
   isAnalyzing: boolean;
   explanation: string;
+  workflowSteps?: WorkflowStep[];
   error: string | null;
 }
 

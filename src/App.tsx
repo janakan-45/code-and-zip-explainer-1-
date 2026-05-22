@@ -5,13 +5,14 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import JSZip from "jszip";
-import { CodeFile, ExplainerState, Language } from "./types";
+import { CodeFile, ExplainerState, Language, WorkflowStep } from "./types";
 import { LANGUAGES } from "./data/languages";
 import { LanguageSelector } from "./components/LanguageSelector";
 import { VoiceNarrator } from "./components/VoiceNarrator";
 import { FileTree } from "./components/FileTree";
 import { CodeViewer } from "./components/CodeViewer";
 import { TutorChat } from "./components/TutorChat";
+import { WorkflowPlayer } from "./components/WorkflowPlayer";
 import Markdown from "react-markdown";
 import {
   Upload,
@@ -168,13 +169,72 @@ It validates input bounds and blocks overflow operations to keep your runtime co
       }
     ];
 
+    const demoExplanation = `### 🚀 Precision Calculation Engine Explained
+
+Welcome to the **Calculation Engine Demo**! This demo project showcases a robust mathematical engine built in TypeScript that enforces strict input parameters and mathematical boundaries.
+
+#### 📂 Codebase Breakdown
+
+1. **\`src/calculator.ts\`**: Contains the core \`CalculationEngine\` class which manages precision decimal limits, performs calculations, and handles error boundaries (such as preventing Division by Zero and checking upper numeric bounds).
+2. **\`src/main.ts\`**: An execution script acting as a dashboard that instantiates the engine, runs safe evaluations, and catches bounds exceptions.
+
+#### 🔄 System Highlights & Execution Workflow
+
+* **Precision Control**: Configures a base decimal precision via constructor parameters.
+* **Input Boundary Limits**: Blocks operations on parameters with absolute value exceeding \`999999\`.
+* **Zero Division Protection**: Immediately intercepts divisions by zero to protect standard runtime container threads from memory/algorithmic exhaustion.`;
+
+    const demoSteps: WorkflowStep[] = [
+      {
+        title: "Instantiate CalculationEngine",
+        description: "The dashboard driver initializes the CalculationEngine in main.ts with a base precision limit of 4.",
+        file: "src/main.ts",
+        lineRange: "135",
+        type: "input",
+        highlightedCode: "const engine = new CalculationEngine(4);"
+      },
+      {
+        title: "Upper Bounds Limit Check",
+        description: "Before every calculation, the engine verifies that both inputs do not exceed the safe limit of 999999.",
+        file: "src/calculator.ts",
+        lineRange: "103-105",
+        type: "condition",
+        highlightedCode: "if (Math.abs(a) > 999999 || Math.abs(b) > 999999) {\n  throw new Error(\"Calculation inputs exceed allowable resource thresholds.\");\n}"
+      },
+      {
+        title: "Evaluate Sum Operation",
+        description: "The engine runs a switch-case statement, matches 'add', and formats the result to the desired precision.",
+        file: "src/calculator.ts",
+        lineRange: "108-109",
+        type: "operation",
+        highlightedCode: "case \"add\":\n  return parseFloat((a + b).toFixed(this.basePrecision));"
+      },
+      {
+        title: "Mathematical Anomaly Div-by-Zero Check",
+        description: "When division is run, the engine checks if the divisor is zero to protect against standard arithmetic overflows.",
+        file: "src/calculator.ts",
+        lineRange: "115-117",
+        type: "error",
+        highlightedCode: "if (b === 0) {\n  throw new Error(\"Mathematical anomaly. Cannot divide by integer zero.\");\n}"
+      },
+      {
+        title: "Dashboard Console Execution",
+        description: "The dashboard runs the division, receives the returns, and displays the result output successfully.",
+        file: "src/main.ts",
+        lineRange: "141-142",
+        type: "output",
+        highlightedCode: "const quotient = engine.evaluate(\"divide\", 100, 3);\nconsole.log(\`Calculated quotient: \${quotient}\`);"
+      }
+    ];
+
     setFiles(demoFiles);
     setSelectedPath("src/calculator.ts");
     setRefactoredContent(null);
     setActiveTab("explanation");
     setState({
       isAnalyzing: false,
-      explanation: "",
+      explanation: demoExplanation,
+      workflowSteps: demoSteps,
       error: null,
     });
   };
@@ -355,9 +415,15 @@ It validates input bounds and blocks overflow operations to keep your runtime co
         throw new Error(data.error || "Failed to calculate technical breakdown.");
       }
 
+      let steps = data.workflowSteps || [];
+      if (steps.length === 0 && activeFile) {
+        steps = generateFallbackWorkflow(activeFile);
+      }
+
       setState({
         isAnalyzing: false,
         explanation: data.explanation,
+        workflowSteps: steps,
         error: null,
       });
 
@@ -1210,6 +1276,13 @@ It validates input bounds and blocks overflow operations to keep your runtime co
                         </div>
                       ) : null}
                     </div>
+
+                    {/* Workflow player walkthrough */}
+                    {state.explanation && state.workflowSteps && state.workflowSteps.length > 0 && (
+                      <div className="mt-6 border-t border-slate-100 pt-6 animate-in fade-in duration-300">
+                        <WorkflowPlayer steps={state.workflowSteps} language={targetLanguage} />
+                      </div>
+                    )}
                   </div>
                 ) : (
                   /* Interactive AI Tutor Chat View */
@@ -1232,6 +1305,144 @@ It validates input bounds and blocks overflow operations to keep your runtime co
       </footer>
     </div>
   );
+}
+
+function generateFallbackWorkflow(file: { path: string; name: string; content: string } | null): WorkflowStep[] {
+  if (!file || !file.content) return [];
+  
+  const steps: WorkflowStep[] = [];
+  const lines = file.content.split("\n");
+  const totalLines = lines.length;
+  const ext = file.name.split(".").pop()?.toLowerCase() || "";
+
+  if (ext === "html") {
+    // Step 1: Input
+    steps.push({
+      title: "Load HTML Document DOM",
+      description: "The web browser initiates HTML parser thread, parsing elements, attributes, and loading external script resources.",
+      file: file.path,
+      lineRange: "1-" + Math.min(10, totalLines),
+      type: "input",
+      highlightedCode: lines.slice(0, Math.min(10, totalLines)).join("\n")
+    });
+
+    // Step 2: Head / Metas
+    let headLine = lines.findIndex(l => l.includes("<head"));
+    if (headLine === -1) headLine = 0;
+    steps.push({
+      title: "Evaluate Document Metadata",
+      description: "Applies CSS stylings, metadata, character encodings, viewport variables, and links standard stylesheets.",
+      file: file.path,
+      lineRange: `${headLine + 1}-${Math.min(headLine + 10, totalLines)}`,
+      type: "condition",
+      highlightedCode: lines.slice(headLine, Math.min(headLine + 10, totalLines)).join("\n")
+    });
+
+    // Step 3: Body Structure
+    let bodyLine = lines.findIndex(l => l.includes("<body"));
+    if (bodyLine === -1) bodyLine = Math.floor(totalLines * 0.3);
+    steps.push({
+      title: "Render HTML Body Layout",
+      description: "Lays out responsive division containers, main grids, buttons, headers, and UI widgets on the browser canvas.",
+      file: file.path,
+      lineRange: `${bodyLine + 1}-${Math.min(bodyLine + 15, totalLines)}`,
+      type: "operation",
+      highlightedCode: lines.slice(bodyLine, Math.min(bodyLine + 15, totalLines)).join("\n")
+    });
+
+    // Step 4: Final output
+    let scriptLine = lines.findIndex(l => l.includes("<script"));
+    if (scriptLine === -1) scriptLine = Math.max(0, totalLines - 10);
+    steps.push({
+      title: "Finalize Client Interface Paint",
+      description: "Triggers any inline Javascript scripts, interactive visual cycles, and mounts standard DOM listeners.",
+      file: file.path,
+      lineRange: `${scriptLine + 1}-${totalLines}`,
+      type: "output",
+      highlightedCode: lines.slice(scriptLine, totalLines).join("\n")
+    });
+  } else if (ext === "css") {
+    steps.push({
+      title: "Load CSS Style Sheet Rules",
+      description: "The browser downloads styles and maps key class descriptors, HSL color tokens, variables, and layouts.",
+      file: file.path,
+      lineRange: "1-" + Math.min(12, totalLines),
+      type: "input",
+      highlightedCode: lines.slice(0, Math.min(12, totalLines)).join("\n")
+    });
+    steps.push({
+      title: "Apply Responsive Media Variables",
+      description: "Determines responsive flex bounds, font styling parameters, grid displays, and glassmorphism elements.",
+      file: file.path,
+      lineRange: `${Math.floor(totalLines * 0.3) + 1}-${Math.min(Math.floor(totalLines * 0.3) + 15, totalLines)}`,
+      type: "condition",
+      highlightedCode: lines.slice(Math.floor(totalLines * 0.3), Math.min(Math.floor(totalLines * 0.3) + 15, totalLines)).join("\n")
+    });
+    steps.push({
+      title: "Mount Keyframe Animations",
+      description: "Loads interactive active buttons visual properties, soft hover effects transitions, and mesh gradients.",
+      file: file.path,
+      lineRange: `${totalLines - 10 > 0 ? totalLines - 10 : 1}-${totalLines}`,
+      type: "render",
+      highlightedCode: lines.slice(Math.max(0, totalLines - 12), totalLines).join("\n")
+    });
+  } else {
+    // Default fallback for JS, TS, Python, etc.
+    steps.push({
+      title: `Initialize ${file.name}`,
+      description: `Loads files dependencies and checks operational configurations before launching thread.`,
+      file: file.path,
+      lineRange: "1-" + Math.min(5, totalLines),
+      type: "input",
+      highlightedCode: lines.slice(0, Math.min(5, totalLines)).join("\n")
+    });
+
+    let mainLine = -1;
+    for (let i = 0; i < totalLines; i++) {
+      if (lines[i].includes("class ") || lines[i].includes("function ") || lines[i].includes("const ") && lines[i].includes("=>")) {
+        mainLine = i;
+        break;
+      }
+    }
+    if (mainLine === -1) mainLine = Math.floor(totalLines * 0.25);
+    steps.push({
+      title: "Parse Algorithmic Core",
+      description: "Compiles functional structures, definitions, and registers parameters constraints in memory.",
+      file: file.path,
+      lineRange: `${mainLine + 1}-${Math.min(mainLine + 6, totalLines)}`,
+      type: "operation",
+      highlightedCode: lines.slice(mainLine, Math.min(mainLine + 6, totalLines)).join("\n")
+    });
+
+    let condLine = -1;
+    for (let i = 0; i < totalLines; i++) {
+      if (lines[i].includes("if ") || lines[i].includes("switch") || lines[i].includes("try {")) {
+        condLine = i;
+        break;
+      }
+    }
+    if (condLine === -1) condLine = Math.floor(totalLines * 0.5);
+    steps.push({
+      title: "Evaluate Exception Boundaries",
+      description: "Validates inputs safety limits and shields core processor threads from logical overflow exceptions.",
+      file: file.path,
+      lineRange: `${condLine + 1}-${Math.min(condLine + 6, totalLines)}`,
+      type: "condition",
+      highlightedCode: lines.slice(condLine, Math.min(condLine + 6, totalLines)).join("\n")
+    });
+
+    let endLine = Math.max(0, totalLines - 5);
+    steps.push({
+      title: "Return Evaluation Data",
+      description: "Releases calculation parameters and returns the final parsed result successfully back to core controller.",
+      file: file.path,
+      lineRange: `${endLine + 1}-${totalLines}`,
+      type: "output",
+      highlightedCode: lines.slice(endLine, totalLines).join("\n")
+    });
+  }
+
+  return steps;
 }
 
 // Minimal inline loader SVG icon to avoid adding unused heavy deps

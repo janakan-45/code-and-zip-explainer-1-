@@ -70,19 +70,29 @@ ${f.content.substring(0, 10000)} ${f.content.length > 10000 ? "\n[CONTENT TRUNCA
   .join("\n\n")}`;
     }
 
-    const languageInstruction = `CRITICAL: You MUST write your ENTIRE explanation in the "${language || "English"}" language. This includes headings, paragraphs, and list items. Keep code blocks as actual code, but explain them strictly in ${language || "English"}.`;
+    const languageInstruction = `CRITICAL: You MUST write your ENTIRE explanation (including titles and descriptions in workflowSteps) in the "${language || "English"}" language. This includes headings, paragraphs, and list items. Keep code blocks as actual code, but explain them strictly in ${language || "English"}.`;
 
     const systemInstruction = `You are an elite, empathetic software tutor and technical communicator.
 Your goal is to explain code to humans in a highly intuitive, incredibly clear, and rewarding format.
 
-When explaining a SINGLE file, structure it like this:
+You MUST respond strictly with a JSON object containing exactly two keys:
+1. "explanation": A string containing your highly refined markdown text explanation of the code.
+2. "workflowSteps": An array of objects representing a step-by-step visual execution workflow or flowchart of the code. Each step object MUST contain:
+   - "title": A short title for the step.
+   - "description": A simple, clear sentence explaining what happens.
+   - "file": The file path associated with this step.
+   - "lineRange": The approximate line range (e.g. "80-83") in the file.
+   - "type": One of: "input" | "condition" | "operation" | "error" | "output" | "network" | "render"
+   - "highlightedCode": The specific lines of code associated with this step.
+
+When explaining a SINGLE file, structure the "explanation" markdown like this:
 1. **🚀 Overall Purpose**: An intuitive metaphor/analogy and simple summary of what the file does.
 2. **🧩 How it Works (Step-by-Step)**: A logical break-down of the processes, algorithms, or execution flow inside this file.
 3. **💡 Core Highlights & Functions**: Identify specific important functions, classes, or patterns and why they matter.
 4. **⚠️ Potential Caveats or Suggestions**: Points that might fail, performance notes, or constructive improvement tips.
 
 When explaining the ENTIRE project archive (selectedPath is empty or null):
-Ensure you focus heavily on the data and logical execution flow across the files. Structure it like this:
+Ensure you focus heavily on the data and logical execution flow across the files. Structure the "explanation" markdown like this:
 1. **🚀 Archive Architecture Summary**: An intuitive macro analogy/metaphor describing what the overall system does.
 2. **📂 Key Component Map**: Briefly list the extracted files and explain their unique role in the machine.
 3. **🔄 Logical Execution Flow**: Explain step-by-step how the system boots or runs. How does data move from the entry point to other helper modules? Where do inputs go, and how do functions link / call each other?
@@ -99,7 +109,7 @@ Mode selected: "${mode || "simple"}" (Format depth adjustment:
 
     const userPrompt = `${contextPrompt}
 
-Please provide your highly refined, empathetic explanation for this code in ${language || "English"}. Highlight code segments or file links where relevant. Use rich Markdown elements (bold text, bullet points, blockquotes, code fences) to make the text beautifully legible. Keep paragraphs relatively small and scannable so it is easy to read.`;
+Please provide your highly refined, empathetic explanation and step-by-step workflow steps for this code in ${language || "English"}. Return strictly in the requested JSON format.`;
 
     const response = await ai.models.generateContent({
       model: "gemini-3.5-flash",
@@ -107,6 +117,7 @@ Please provide your highly refined, empathetic explanation for this code in ${la
       config: {
         systemInstruction,
         temperature: 0.25,
+        responseMimeType: "application/json",
       },
     });
 
@@ -115,7 +126,27 @@ Please provide your highly refined, empathetic explanation for this code in ${la
       return;
     }
 
-    res.json({ explanation: response.text });
+    try {
+      let cleanedText = response.text.trim();
+      
+      // Try to extract JSON object from text using regex in case it is wrapped in markdown code blocks
+      const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        cleanedText = jsonMatch[0];
+      }
+
+      const parsed = JSON.parse(cleanedText);
+      res.json({
+        explanation: parsed.explanation || response.text,
+        workflowSteps: parsed.workflowSteps || []
+      });
+    } catch (parseErr) {
+      console.warn("Failed to parse Gemini response as JSON. Falling back to raw response text.", parseErr);
+      res.json({
+        explanation: response.text,
+        workflowSteps: []
+      });
+    }
   } catch (error: any) {
     console.error("Gemini API call failed:", error);
     res.status(500).json({ error: error.message || "An unexpected error occurred on the server." });
