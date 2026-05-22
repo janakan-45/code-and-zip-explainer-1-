@@ -1,0 +1,6 @@
+{
+  "name": "Code and ZIP Explainer",
+  "description": "An interactive tool to analyze and explain individual code files or uploaded ZIP archives. Supports multi-language translation and voice accessibility.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
