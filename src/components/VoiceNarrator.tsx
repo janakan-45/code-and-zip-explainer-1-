@@ -36,12 +36,20 @@ export function VoiceNarrator({ text, language }: VoiceNarratorProps) {
       return;
     }
 
-    // Strip code blocks entirely from spoken path (talking code blocks is extremely noisy)
-    let processed = text.replace(/```[\s\S]*?```/g, " [Code block skipped] ");
-    // Convert headers to natural voice transitions
+    // 1. Strip multi-line code blocks completely (replace with silent space)
+    let processed = text.replace(/```[\s\S]*?```/g, " ");
+
+    // 2. Remove HTML/XML tags entirely so it doesn't speak "less than title greater than"
+    processed = processed.replace(/<[^>]*>/g, " ");
+
+    // 3. Convert headers to natural voice pauses / transitions
     processed = processed.replace(/^#+\s*(.*?)$/gm, "$1. ");
-    // Strip other styling markdown
-    processed = processed.replace(/[*_`\[\]()\-#]/g, "");
+
+    // 4. Strip specific markdown formatting symbols and punctuation that get read awkwardly
+    processed = processed.replace(/[`*_\-\[\]\(\)#~+=|\\/]/g, " ");
+
+    // 5. Clean up duplicate spaces and newlines
+    processed = processed.replace(/\s+/g, " ").trim();
     
     setCleanText(processed);
   }, [text]);
