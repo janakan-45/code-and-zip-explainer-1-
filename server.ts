@@ -122,6 +122,129 @@ Please provide your highly refined, empathetic explanation for this code in ${la
   }
 });
 
+// REST API endpoint: AI Tutor Chat Q&A
+app.post("/api/chat", async (req, res) => {
+  try {
+    const { files, selectedPath, messages, language } = req.body;
+
+    if (!files || !Array.isArray(files) || files.length === 0) {
+      res.status(400).json({ error: "No files provided for context." });
+      return;
+    }
+
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      res.status(400).json({ error: "No message history provided." });
+      return;
+    }
+
+    const ai = getGeminiClient();
+
+    // Format current files context
+    let contextPrompt = "";
+    if (selectedPath) {
+      const currentFile = files.find((f) => f.path === selectedPath);
+      if (currentFile) {
+        contextPrompt = `You are a helpful software tutor answering questions about this specific file:
+File Path: ${currentFile.path}
+File Content:
+\`\`\`
+${currentFile.content}
+\`\`\``;
+      }
+    } else {
+      contextPrompt = `You are a helpful software tutor answering questions about this entire project:
+${files
+  .map(
+    (f) => `--- File: ${f.path} ---
+${f.content.substring(0, 8000)}`
+  )
+  .join("\n\n")}`;
+    }
+
+    const systemInstruction = `${contextPrompt}
+    
+CRITICAL: You MUST write your response in the "${language || "English"}" language. Keep your tone supportive, clear, warm, and highly tutorial.
+Explain things simply but with technical depth where useful. Use clean Markdown elements.`;
+
+    // Map conversation history to content objects for Google Gen AI SDK
+    const contents = messages.map((msg: any) => ({
+      role: msg.role === "user" ? "user" : "model",
+      parts: [{ text: msg.content }],
+    }));
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents,
+      config: {
+        systemInstruction,
+        temperature: 0.3,
+      },
+    });
+
+    if (!response.text) {
+      res.status(500).json({ error: "Received empty response from Gemini API." });
+      return;
+    }
+
+    res.json({ reply: response.text });
+  } catch (error: any) {
+    console.error("Gemini Chat API call failed:", error);
+    res.status(500).json({ error: error.message || "An unexpected error occurred during chat." });
+  }
+});
+
+// REST API endpoint: AI Code Refactoring
+app.post("/api/refactor", async (req, res) => {
+  try {
+    const { file, prompt } = req.body;
+
+    if (!file || !file.content) {
+      res.status(400).json({ error: "No file provided for refactoring." });
+      return;
+    }
+
+    const ai = getGeminiClient();
+
+    const systemInstruction = `You are an elite software refactoring agent.
+Your ONLY task is to refactor the provided code block according to the instructions.
+CRITICAL: You MUST ONLY return the refactored code. Do NOT wrap it in markdown code blocks like \`\`\`ts or \`\`\`. Do NOT include introductory text, explanations, or trailing commentary. Return only the raw code lines.
+
+Refactoring Request instruction: "${prompt}"`;
+
+    const userPrompt = `Here is the current code of the file "${file.path}":
+\`\`\`
+${file.content}
+\`\`\``;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: userPrompt,
+      config: {
+        systemInstruction,
+        temperature: 0.1,
+      },
+    });
+
+    let refactoredCode = response.text || "";
+    // Sanitize any accidental markdown code fences
+    if (refactoredCode.trim().startsWith("```")) {
+      const lines = refactoredCode.split("\n");
+      if (lines[0].trim().startsWith("```")) {
+        lines.shift();
+      }
+      if (lines[lines.length - 1].trim().startsWith("```")) {
+        lines.pop();
+      }
+      refactoredCode = lines.join("\n");
+    }
+
+    res.json({ refactoredCode });
+  } catch (error: any) {
+    console.error("Gemini Refactor API call failed:", error);
+    res.status(500).json({ error: error.message || "An unexpected error occurred during refactoring." });
+  }
+});
+
 // Setup Vite development or production static files serving
 async function initializeServer() {
   if (process.env.NODE_ENV !== "production") {
